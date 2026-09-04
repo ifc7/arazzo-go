@@ -18,20 +18,23 @@ import (
 
 // Executor runs Arazzo HTTP steps with a cookie jar and operationId resolution.
 type Executor struct {
-	mu      sync.Mutex
-	client  *http.Client
-	baseURL string
-	sources []*libarazzo.ResolvedSource
-	logger  *slog.Logger
+	mu            sync.Mutex
+	client        *http.Client
+	baseURL       string
+	sources       []*libarazzo.ResolvedSource
+	logger        *slog.Logger
+	arazzoParamIn map[string]string
 }
 
 // New returns an HTTP executor. A cookie jar is attached if the client lacks one.
-func New(client *http.Client, baseURL string, sources []*libarazzo.ResolvedSource, logger *slog.Logger) *Executor {
+// arazzoParamIn maps parameter names to Arazzo `in` locations (header, query, path, cookie).
+func New(client *http.Client, baseURL string, sources []*libarazzo.ResolvedSource, logger *slog.Logger, arazzoParamIn map[string]string) *Executor {
 	return &Executor{
-		client:  ensureCookieJar(client),
-		baseURL: baseURL,
-		sources: sources,
-		logger:  logger,
+		client:        ensureCookieJar(client),
+		baseURL:       baseURL,
+		sources:       sources,
+		logger:        logger,
+		arazzoParamIn: arazzoParamIn,
 	}
 }
 
@@ -100,7 +103,7 @@ func (e *Executor) Execute(ctx context.Context, req *libarazzo.ExecutionRequest)
 	var cookies []*http.Cookie
 
 	for name, value := range req.Parameters {
-		loc := paramLocation(name, path, paramIn)
+		loc := paramLocation(name, path, paramIn, e.arazzoParamIn)
 		rendered := fmt.Sprintf("%v", value)
 		switch loc {
 		case "path":
@@ -173,7 +176,7 @@ func (e *Executor) Execute(ctx context.Context, req *libarazzo.ExecutionRequest)
 	if e.logger != nil {
 		e.logger.Info("arazzo request",
 			"method", method,
-			"url", target.String(),
+			"url", redactURL(target.String()),
 			"operationId", req.OperationID,
 			"body", redactJSON(req.RequestBody),
 		)

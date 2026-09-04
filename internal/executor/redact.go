@@ -2,6 +2,7 @@ package executor
 
 import (
 	"encoding/json"
+	"net/url"
 	"strings"
 )
 
@@ -57,4 +58,24 @@ func redactJSON(v any) string {
 		return "<unserializable>"
 	}
 	return string(b)
+}
+
+func redactURL(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	q := u.Query()
+	changed := false
+	for k := range q {
+		if isSecretKey(k) {
+			q.Set(k, "***")
+			changed = true
+		}
+	}
+	if !changed {
+		return raw
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
 }

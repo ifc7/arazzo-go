@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	libarazzo "github.com/pb33f/libopenapi/arazzo"
+	"github.com/pb33f/libopenapi/datamodel/high/base"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 )
 
@@ -85,14 +86,14 @@ func findOperation(doc *v3.Document, operationID string) (*resolvedOperation, bo
 			return &resolvedOperation{
 				method:  strings.ToUpper(method),
 				path:    pathName,
-				paramIn: collectParamLocations(pathItem, operation),
+				paramIn: collectParamLocations(doc, pathItem, operation),
 			}, true
 		}
 	}
 	return nil, false
 }
 
-func collectParamLocations(pathItem *v3.PathItem, operation *v3.Operation) map[string]string {
+func collectParamLocations(doc *v3.Document, pathItem *v3.PathItem, operation *v3.Operation) map[string]string {
 	locs := make(map[string]string)
 	add := func(params []*v3.Parameter) {
 		for _, p := range params {
@@ -107,16 +108,35 @@ func collectParamLocations(pathItem *v3.PathItem, operation *v3.Operation) map[s
 	}
 	if operation != nil {
 		add(operation.Parameters)
+		addSecurityLocations(locs, doc, operation.Security)
+		if len(operation.Security) == 0 && doc != nil {
+			addSecurityLocations(locs, doc, doc.Security)
+		}
 	}
 	return locs
 }
 
-func paramLocation(name string, pathTemplate string, known map[string]string) string {
-	if strings.Contains(pathTemplate, "{"+name+"}") {
-		return "path"
+func addSecurityLocations(locs map[string]string, doc *v3.Document, reqs []*base.SecurityRequirement) {
+	if doc == nil || doc.Components == nil || doc.Components.SecuritySchemes == nil {
+		return
 	}
-	if loc, ok := known[name]; ok {
-		return loc
+	for _, req := range reqs {
+		if req == nil || req.Requirements == nil {
+			continue
+		}
+		for name := range req.Requirements.FromOldest() {
+			scheme := doc.Components.SecuritySchemes.GetOrZero(name)
+			if scheme == nil {
+				continue
+			}
+			switch strings.ToLower(scheme.Type) {
+			case "http", "oauth2", "openidconnect":
+				locs["Authorization"] = "header"
+			case "apikey":
+				if scheme.Name != "" && scheme.In != "" {
+					locs[scheme.Name] = strings.ToLower(scheme.In)
+				}
+			}
+		}
 	}
-	return "query"
 }

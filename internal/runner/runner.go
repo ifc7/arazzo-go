@@ -143,7 +143,7 @@ func fromBytes(path string, data []byte, opts ...Option) (*Runner, error) {
 		return nil, fmt.Errorf("resolve source descriptions: %w", err)
 	}
 
-	exec := executor.New(client, cfg.baseURL, resolved, cfg.logger)
+	exec := executor.New(client, cfg.baseURL, resolved, cfg.logger, executor.ArazzoParameterLocations(doc))
 	engineCfg := &libarazzo.EngineConfig{}
 	if cfg.sleepFunc != nil {
 		engineCfg.SleepFunc = cfg.sleepFunc
