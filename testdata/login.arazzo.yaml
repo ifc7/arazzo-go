@@ -1,0 +1,311 @@
+# =============================================================================
+# ifc7 — user session login workflow (Arazzo 1.0.1)
+#
+# Describes the custom-UI (email/password) login against the Interface Auth BFF
+# API, including the Cognito challenge branches that can interrupt it.
+#
+# CREDENTIALS: nothing secret appears in this file. `email` and `password` are
+# declared as workflow inputs and MUST be injected at run time by the runner
+# from an environment variable or a secret manager. See credentials.md.
+#
+# SESSION STATE: this API is cookie-based. `ifc_session` and `ifc_refresh` are
+# HttpOnly; `ifc_csrf` is readable. An Arazzo runner is an HTTP client, not a
+# browser, so it does see all three on `Set-Cookie` — but only if it keeps a
+# cookie jar across steps. Enable the jar in your runner; the steps below and
+# any workflow you chain onto this one assume it.
+# =============================================================================
+
+arazzo: 1.0.1
+
+info:
+  title: ifc7 User Session Login
+  summary: Establish an authenticated ifc7 session with email and password.
+  description: |
+    Drives `POST /auth/login` (Cognito `USER_PASSWORD_AUTH`) to completion, resolving the
+    `NEW_PASSWORD_REQUIRED` and `SOFTWARE_TOKEN_MFA` challenges that Cognito can raise before it
+    will issue a session.
+
+    A successful run ends with the browser-equivalent session cookies set on the runner's cookie
+    jar: `ifc_session` (ID token, HttpOnly), `ifc_refresh` (refresh token, HttpOnly, scoped to
+    `/api/v0/auth`), and `ifc_csrf` (readable, echoed as `X-CSRF-Token` on state-changing calls
+    to the main API).
+
+    The redirect/federation style (`GET /auth/login` → Hosted UI → `GET /auth/callback`) is
+    deliberately out of scope: the middle hop happens in a browser and cannot be expressed as
+    Arazzo steps.
+  version: 1.0.0
+
+sourceDescriptions:
+  - name: userSessionApi
+    # Canonical interface URL. If your runner cannot dereference the ifc7 HTML page directly,
+    # point this at a local copy or a raw revision export instead.
+    url: https://ifc7.dev/i/interface-7/user-session-api
+    type: openapi
+
+workflows:
+  - workflowId: login-with-password
+    summary: Log in with email and password, answering any Cognito challenge.
+    description: |
+      Terminates in one of three states:
+
+      - **session established** — `204` from `/auth/login` or `/auth/login/challenge`;
+      - **blocked pending user action** — `403` with reason `user_not_confirmed` or
+        `password_reset_required`, neither of which an automated workflow can resolve;
+      - **failed** — `400`, `401`, an unsupported challenge type, exhausted retries on `429`/`502`,
+        or `503` when password login is not configured for the target environment.
+    inputs:
+      $ref: '#/components/inputs/loginInputs'
+
+    steps:
+      # -----------------------------------------------------------------------
+      # 1. Submit credentials.
+      #    204 = session established. 200 = Cognito wants a challenge answered first.
+      # -----------------------------------------------------------------------
+      - stepId: submit-credentials
+        description: |
+          Posts the email/password pair to `POST /auth/login`. On `204` the session cookies are
+          set and the workflow is done; on `200` the body carries a `ChallengeResponse` whose
+          `challengeName` selects the next step.
+        operationId: $sourceDescriptions.userSessionApi.passwordLogin
+        # `x-serverUrl` is a vendor extension honoured by some runners (e.g. Redocly) to choose
+        # among the spec's `servers`. Runners that don't support it ignore it — select the target
+        # environment through runner configuration in that case.
+        x-serverUrl: $inputs.baseUrl
+        requestBody:
+          contentType: application/json
+          payload:
+            email: $inputs.email
+            password: $inputs.password
+        successCriteria:
+          # A `200` carrying a challenge this workflow does not implement (MFA_SETUP, SMS_MFA, …)
+          # is treated as a step failure on purpose: the run stops here with the offending
+          # `challengeName` captured in the outputs below, rather than falling through into a
+          # step that would answer the wrong challenge.
+          - condition: >-
+              $statusCode == 204 ||
+              ($statusCode == 200 &&
+                ($response.body#/challengeName == 'NEW_PASSWORD_REQUIRED' ||
+                 $response.body#/challengeName == 'SOFTWARE_TOKEN_MFA'))
+        onSuccess:
+          - name: sessionEstablished
+            type: end
+            criteria:
+              - condition: $statusCode == 204
+          - name: forcedPasswordChange
+            type: goto
+            stepId: answer-new-password
+            criteria:
+              - condition: $response.body#/challengeName == 'NEW_PASSWORD_REQUIRED'
+          - name: totpRequired
+            type: goto
+            stepId: answer-totp-mfa
+            criteria:
+              - condition: $response.body#/challengeName == 'SOFTWARE_TOKEN_MFA'
+        onFailure:
+          - reference: $components.failureActions.retryRateLimited
+          - reference: $components.failureActions.retryUpstream
+          - reference: $components.failureActions.abortOnAuthError
+        outputs:
+          challengeName: $response.body#/challengeName
+          # Opaque Cognito session token. Short-lived and single-use, but a bearer credential in
+          # its own right — keep it out of logs and CI artifacts.
+          challengeSession: $response.body#/session
+          challengeParameters: $response.body#/parameters
+          # Diagnostic only. A response sets three separate `Set-Cookie` headers and runners
+          # differ on whether this expression yields the first or all of them joined; assert
+          # cookie attributes with it, but chain authenticated calls off the cookie jar.
+          setCookie: $response.header.Set-Cookie
+
+      # -----------------------------------------------------------------------
+      # 2a. NEW_PASSWORD_REQUIRED — forced password change on first sign-in.
+      # -----------------------------------------------------------------------
+      - stepId: answer-new-password
+        description: |
+          Answers `NEW_PASSWORD_REQUIRED` with `$inputs.newPassword`. Cognito may chain a second
+          challenge (TOTP) once the password is accepted, so a `200` here routes on to
+          `answer-totp-after-password-change` rather than failing.
+
+          A successful run of this step permanently changes the account's password: the value in
+          `$inputs.newPassword` becomes the credential your secret store must hold from that
+          point on. Keep this branch out of unattended CI unless the same pipeline writes the new
+          value back to the secret store.
+        operationId: $sourceDescriptions.userSessionApi.respondToLoginChallenge
+        x-serverUrl: $inputs.baseUrl
+        requestBody:
+          contentType: application/json
+          payload:
+            challengeName: $steps.submit-credentials.outputs.challengeName
+            session: $steps.submit-credentials.outputs.challengeSession
+            email: $inputs.email
+            responses:
+              NEW_PASSWORD: $inputs.newPassword
+        successCriteria:
+          - condition: >-
+              $statusCode == 204 ||
+              ($statusCode == 200 && $response.body#/challengeName == 'SOFTWARE_TOKEN_MFA')
+        onSuccess:
+          - name: sessionEstablished
+            type: end
+            criteria:
+              - condition: $statusCode == 204
+          - name: totpRequiredAfterPasswordChange
+            type: goto
+            stepId: answer-totp-after-password-change
+            criteria:
+              - condition: $statusCode == 200
+        onFailure:
+          - reference: $components.failureActions.retryRateLimited
+          - reference: $components.failureActions.retryUpstream
+          # `400` with reason `invalid_password` means the new password failed the Cognito
+          # user-pool policy; replaying the same body cannot help.
+          - reference: $components.failureActions.abortOnAuthError
+        outputs:
+          # Cognito issues a *fresh* session token with each challenge response, so the TOTP step
+          # that follows this one must use this value, not the original.
+          challengeSession: $response.body#/session
+
+      # -----------------------------------------------------------------------
+      # 2b. SOFTWARE_TOKEN_MFA chained after a password change.
+      #     Split from the direct-MFA step below because each reads its session token from a
+      #     different predecessor, and a step that was skipped has no outputs to read.
+      # -----------------------------------------------------------------------
+      - stepId: answer-totp-after-password-change
+        description: Answers the TOTP challenge Cognito raised after accepting the new password.
+        operationId: $sourceDescriptions.userSessionApi.respondToLoginChallenge
+        x-serverUrl: $inputs.baseUrl
+        requestBody:
+          contentType: application/json
+          payload:
+            challengeName: SOFTWARE_TOKEN_MFA
+            session: $steps.answer-new-password.outputs.challengeSession
+            email: $inputs.email
+            responses:
+              SOFTWARE_TOKEN_MFA_CODE: $inputs.totpCode
+        successCriteria:
+          - condition: $statusCode == 204
+        onSuccess:
+          - name: sessionEstablished
+            type: end
+        onFailure:
+          - reference: $components.failureActions.retryRateLimited
+          - reference: $components.failureActions.retryUpstream
+          - reference: $components.failureActions.abortOnAuthError
+
+      # -----------------------------------------------------------------------
+      # 2c. SOFTWARE_TOKEN_MFA raised directly by /auth/login.
+      # -----------------------------------------------------------------------
+      - stepId: answer-totp-mfa
+        description: |
+          Answers `SOFTWARE_TOKEN_MFA` with a six-digit TOTP code. The code is valid for a single
+          ~30-second window, so it must be generated immediately before the run from the
+          authenticator seed — never pinned in configuration. `$inputs.totpCode` therefore has no
+          default and no example: a stale value fails with `401 invalid_code`.
+        operationId: $sourceDescriptions.userSessionApi.respondToLoginChallenge
+        x-serverUrl: $inputs.baseUrl
+        requestBody:
+          contentType: application/json
+          payload:
+            challengeName: $steps.submit-credentials.outputs.challengeName
+            session: $steps.submit-credentials.outputs.challengeSession
+            email: $inputs.email
+            responses:
+              SOFTWARE_TOKEN_MFA_CODE: $inputs.totpCode
+        successCriteria:
+          - condition: $statusCode == 204
+        onSuccess:
+          - name: sessionEstablished
+            type: end
+        onFailure:
+          - reference: $components.failureActions.retryRateLimited
+          - reference: $components.failureActions.retryUpstream
+          # `invalid_code` / `expired_code` need a freshly generated TOTP, not a replay of the
+          # same request body — fail fast and let the caller re-run the workflow.
+          - reference: $components.failureActions.abortOnAuthError
+
+    outputs:
+      # Only `submit-credentials` is guaranteed to have run, so workflow outputs read from it
+      # alone. `challengeEncountered` is empty on the straight-through (`204`) path.
+      challengeEncountered: $steps.submit-credentials.outputs.challengeName
+      loginSetCookie: $steps.submit-credentials.outputs.setCookie
+
+components:
+  inputs:
+    loginInputs:
+      type: object
+      title: ifc7 login inputs
+      description: |
+        Every field here is supplied by the runner at invocation time. Do not add `default` or
+        `example` values to the secret fields — an example value is the shortest path from a spec
+        file to a live credential on a docs site.
+      properties:
+        baseUrl:
+          type: string
+          format: uri
+          description: |
+            API base URL for the target environment, matching one of the spec's `servers`:
+            `http://localhost:8080/api/v0`, `https://dev.ifc7.dev/api/v0`, or
+            `https://staging.ifc7.dev/api/v0`.
+          default: http://localhost:8080/api/v0
+        email:
+          type: string
+          format: email
+          description: |
+            Sign-in identifier. Not a secret on its own, but it identifies a real account and
+            pairs with one — inject it rather than committing it.
+        password:
+          type: string
+          format: password
+          writeOnly: true
+          description: |
+            Current account password. Injected from the environment or a secret manager; never
+            written into this document, a fixture, or a runner log.
+        newPassword:
+          type: string
+          format: password
+          writeOnly: true
+          description: |
+            Replacement password, used only on the `NEW_PASSWORD_REQUIRED` branch. Must satisfy
+            the Cognito user-pool password policy or the challenge fails with `invalid_password`.
+        totpCode:
+          type: string
+          pattern: '^[0-9]{6}$'
+          writeOnly: true
+          description: |
+            Six-digit TOTP code, generated at run time from the authenticator seed. Valid for a
+            single time window — a value stored in configuration will always fail.
+      required:
+        - email
+        - password
+
+  failureActions:
+    retryRateLimited:
+      name: retryRateLimited
+      description: |
+        `429` is the Cognito rate limit, not a credential problem. Back off and retry the same
+        step. Keep the limit low: repeated attempts against one account trip Cognito's lockout,
+        which an eager retry loop only deepens.
+      type: retry
+      retryAfter: 5
+      retryLimit: 3
+      criteria:
+        - condition: $statusCode == 429
+
+    retryUpstream:
+      name: retryUpstream
+      description: Transient `502` talking to Cognito; retry briefly before giving up.
+      type: retry
+      retryAfter: 2
+      retryLimit: 2
+      criteria:
+        - condition: $statusCode == 502
+
+    abortOnAuthError:
+      name: abortOnAuthError
+      description: |
+        Terminal for this workflow. Covers `400` (malformed request, `invalid_password`), `401`
+        (`invalid_credentials`, `invalid_code`, `expired_code`), `403` (`user_not_confirmed`,
+        `password_reset_required` — both need a human), and `503` (password login not configured
+        for this environment). The `reason` field of the `AuthError` body says which.
+      type: end
+      criteria:
+        - condition: $statusCode >= 400

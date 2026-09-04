@@ -1,0 +1,21 @@
+arazzo: 1.0.1
+info:
+  title: Cookie jar smoke
+  version: 1.0.0
+sourceDescriptions:
+  - name: api
+    url: cookie-api.yaml
+    type: openapi
+workflows:
+  - workflowId: cookie-roundtrip
+    steps:
+      - stepId: set-cookie
+        operationId: $sourceDescriptions.api.setCookie
+        successCriteria:
+          - condition: $statusCode == 204
+      - stepId: echo-cookie
+        operationId: $sourceDescriptions.api.echoCookie
+        successCriteria:
+          - condition: $statusCode == 200
+        outputs:
+          session: $response.body#/session

@@ -1,0 +1,17 @@
+openapi: 3.0.3
+info:
+  title: Cookie API
+  version: 1.0.0
+paths:
+  /set:
+    post:
+      operationId: setCookie
+      responses:
+        "204":
+          description: cookie set
+  /echo:
+    get:
+      operationId: echoCookie
+      responses:
+        "200":
+          description: cookie echoed
