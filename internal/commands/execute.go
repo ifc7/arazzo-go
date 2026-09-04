@@ -11,6 +11,7 @@ import (
 var (
 	executeWorkflowID string
 	executeInputs     string
+	executeVerbose    bool
 )
 
 var executeCmd = &cobra.Command{
@@ -22,6 +23,9 @@ Execute a workflow by id. Pass workflow inputs as a JSON object.
 The runner does not inject authentication. Include credentials in --inputs
 and rely on the cookie jar for later steps. A baseUrl input (or --inputs
 baseUrl) is required unless the document already targets an absolute host.
+
+HTTP request and response traces are off by default. Pass --verbose (or
+--log-level=debug) to print them.
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -32,7 +36,7 @@ baseUrl) is required unless the document already targets an absolute host.
 			}
 		}
 
-		r, err := loadRunner(args[0])
+		r, err := loadRunner(args[0], executeVerbose)
 		if err != nil {
 			return err
 		}
@@ -52,6 +56,7 @@ baseUrl) is required unless the document already targets an absolute host.
 func init() {
 	executeCmd.Flags().StringVar(&executeWorkflowID, "workflow-id", "", "workflow to run")
 	executeCmd.Flags().StringVar(&executeInputs, "inputs", "{}", "JSON object of workflow inputs")
+	executeCmd.Flags().BoolVarP(&executeVerbose, "verbose", "v", false, "log each HTTP request and response")
 	_ = executeCmd.MarkFlagRequired("workflow-id")
 	rootCmd.AddCommand(executeCmd)
 }

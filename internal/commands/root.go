@@ -48,8 +48,19 @@ func init() {
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "debug, info, warn, or error")
 }
 
-func loadRunner(path string) (*runner.Runner, error) {
-	return runner.FromFile(path, runner.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: parseLogLevel(logLevel)}))))
+func loadRunner(path string, verbose bool) (*runner.Runner, error) {
+	return runner.FromFile(path, runner.WithLogger(newCLILogger(verbose)))
+}
+
+func newCLILogger(verbose bool) *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: effectiveLogLevel(logLevel, verbose)}))
+}
+
+func effectiveLogLevel(raw string, verbose bool) slog.Level {
+	if verbose {
+		return slog.LevelDebug
+	}
+	return parseLogLevel(raw)
 }
 
 func parseLogLevel(raw string) slog.Level {

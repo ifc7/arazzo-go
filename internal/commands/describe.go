@@ -16,7 +16,7 @@ Print the workflow summary, description, steps, and output names.
 `,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		r, err := loadRunner(args[0])
+		r, err := loadRunner(args[0], false)
 		if err != nil {
 			return err
 		}

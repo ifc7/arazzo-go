@@ -31,6 +31,7 @@ require (
 	golang.org/x/sys v0.30.0 // indirect
 )
 
-// ifc7/libopenapi: &&/||/parentheses in simple criteria, and nil for missing
-// step outputs / empty response bodies.
-replace github.com/pb33f/libopenapi => github.com/ifc7/libopenapi v0.0.0-20260904005513-5fa3cca83d11
+// ifc7/libopenapi: &&/||/parentheses in simple criteria, nil for missing
+// step outputs / empty response bodies, and integer 0/1 in simple conditions
+// (strconv.ParseBool must not win over ParseInt).
+replace github.com/pb33f/libopenapi => github.com/ifc7/libopenapi v0.0.0-20260904033543-203ee234ac75

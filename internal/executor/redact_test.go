@@ -22,6 +22,16 @@ func TestRedactSecrets(t *testing.T) {
 	}
 }
 
+func TestTruncateForLog(t *testing.T) {
+	t.Parallel()
+	if got := truncateForLog("short", 10); got != "short" {
+		t.Fatalf("got %q", got)
+	}
+	if got := truncateForLog("abcdefghij", 4); got != "abcd…" {
+		t.Fatalf("got %q", got)
+	}
+}
+
 func TestRedactURLHidesAuthorizationQuery(t *testing.T) {
 	t.Parallel()
 	raw := "https://example.com/api/v1/asset-models?Authorization=Bearer+secret-token&limit=10"

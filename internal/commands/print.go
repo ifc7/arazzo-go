@@ -3,10 +3,12 @@ package commands
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/shaunhoulihan/arazzo-go/internal/runner"
 	"github.com/shaunhoulihan/arazzo-go/internal/ui"
+	"go.yaml.in/yaml/v4"
 )
 
 func formatWorkflowList(workflows []runner.WorkflowInfo) string {
@@ -133,9 +135,75 @@ func formatResult(result *runner.Result) string {
 }
 
 func formatJSON(v any) string {
-	b, err := json.Marshal(v)
+	b, err := json.Marshal(jsonable(v))
 	if err != nil {
 		return fmt.Sprintf("%v", v)
 	}
 	return string(b)
+}
+
+func jsonable(v any) any {
+	switch t := v.(type) {
+	case *yaml.Node:
+		return yamlNodeJSON(t)
+	case yaml.Node:
+		return yamlNodeJSON(&t)
+	case map[string]any:
+		out := make(map[string]any, len(t))
+		for k, val := range t {
+			out[k] = jsonable(val)
+		}
+		return out
+	case []any:
+		out := make([]any, len(t))
+		for i, val := range t {
+			out[i] = jsonable(val)
+		}
+		return out
+	default:
+		return v
+	}
+}
+
+func yamlNodeJSON(node *yaml.Node) any {
+	if node == nil {
+		return nil
+	}
+	if node.Kind == yaml.DocumentNode && len(node.Content) > 0 {
+		return yamlNodeJSON(node.Content[0])
+	}
+	switch node.Kind {
+	case yaml.MappingNode:
+		out := make(map[string]any, len(node.Content)/2)
+		for i := 0; i+1 < len(node.Content); i += 2 {
+			out[node.Content[i].Value] = yamlNodeJSON(node.Content[i+1])
+		}
+		return out
+	case yaml.SequenceNode:
+		out := make([]any, len(node.Content))
+		for i, child := range node.Content {
+			out[i] = yamlNodeJSON(child)
+		}
+		return out
+	case yaml.ScalarNode:
+		switch node.Tag {
+		case "!!int":
+			if v, err := strconv.ParseInt(node.Value, 10, 64); err == nil {
+				return v
+			}
+		case "!!float":
+			if v, err := strconv.ParseFloat(node.Value, 64); err == nil {
+				return v
+			}
+		case "!!bool":
+			if v, err := strconv.ParseBool(node.Value); err == nil {
+				return v
+			}
+		case "!!null":
+			return nil
+		}
+		return node.Value
+	default:
+		return node.Value
+	}
 }

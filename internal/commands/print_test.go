@@ -7,6 +7,7 @@ import (
 	"time"
 
 	libarazzo "github.com/pb33f/libopenapi/arazzo"
+	"go.yaml.in/yaml/v4"
 
 	"github.com/shaunhoulihan/arazzo-go/internal/runner"
 )
@@ -77,5 +78,22 @@ func TestFormatResult(t *testing.T) {
 	}
 	if !strings.Contains(got, "unauthorized") {
 		t.Fatalf("missing workflow error: %q", got)
+	}
+}
+
+func TestFormatJSONRendersYAMLMappingNodes(t *testing.T) {
+	node := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	node.Content = []*yaml.Node{
+		{Kind: yaml.ScalarNode, Tag: "!!str", Value: "high"},
+		{Kind: yaml.ScalarNode, Tag: "!!float", Value: "1"},
+		{Kind: yaml.ScalarNode, Tag: "!!str", Value: "critical"},
+		{Kind: yaml.ScalarNode, Tag: "!!float", Value: "0"},
+	}
+	got := formatJSON(map[string]any{"issueCounts": node})
+	if !strings.Contains(got, `"high":1`) || !strings.Contains(got, `"critical":0`) {
+		t.Fatalf("expected readable counts, got %s", got)
+	}
+	if strings.Contains(got, `"Kind"`) {
+		t.Fatalf("raw yaml.Node leaked: %s", got)
 	}
 }

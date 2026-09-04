@@ -174,7 +174,7 @@ func (e *Executor) Execute(ctx context.Context, req *libarazzo.ExecutionRequest)
 	}
 
 	if e.logger != nil {
-		e.logger.Info("arazzo request",
+		e.logger.Debug("arazzo request",
 			"method", method,
 			"url", redactURL(target.String()),
 			"operationId", req.OperationID,
@@ -194,11 +194,15 @@ func (e *Executor) Execute(ctx context.Context, req *libarazzo.ExecutionRequest)
 	}
 
 	if e.logger != nil {
-		e.logger.Info("arazzo response",
+		attrs := []any{
 			"status", resp.StatusCode,
 			"bytes", len(respBytes),
 			"operationId", req.OperationID,
-		)
+		}
+		if resp.StatusCode >= 400 && len(respBytes) > 0 {
+			attrs = append(attrs, "body", truncateForLog(string(respBytes), 512))
+		}
+		e.logger.Debug("arazzo response", attrs...)
 	}
 
 	var body any
