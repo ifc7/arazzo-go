@@ -131,15 +131,7 @@ func fromBytes(path string, data []byte, opts ...Option) (*Runner, error) {
 		FSRoots:     fsRoots,
 		Timeout:     30 * time.Second,
 		OpenAPIFactory: func(sourceURL string, b []byte) (*v3.Document, error) {
-			document, err := libopenapi.NewDocument(b)
-			if err != nil {
-				return nil, fmt.Errorf("parse openapi %s: %w", sourceURL, err)
-			}
-			model, err := document.BuildV3Model()
-			if err != nil {
-				return nil, fmt.Errorf("build openapi model %s: %w", sourceURL, err)
-			}
-			return &model.Model, nil
+			return buildOpenAPIDocument(sourceURL, b, cfg.logger)
 		},
 		ArazzoFactory: func(sourceURL string, b []byte) (*higharazzo.Arazzo, error) {
 			return libopenapi.NewArazzoDocument(b)
