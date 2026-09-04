@@ -176,6 +176,11 @@ func (r *Runner) ExecuteWorkflow(ctx context.Context, workflowID string, inputs 
 	if inputs == nil {
 		inputs = map[string]any{}
 	}
+	merged, err := applyWorkflowInputDefaults(r.doc, workflowID, inputs)
+	if err != nil {
+		return nil, err
+	}
+	inputs = merged
 	if v, ok := inputs["baseUrl"].(string); ok && strings.TrimSpace(v) != "" {
 		r.executor.SetBaseURL(strings.TrimSpace(v))
 	}
