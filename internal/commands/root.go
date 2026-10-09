@@ -18,8 +18,9 @@ var (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "arazzo",
-	Short: "Run Arazzo 1.0.1 workflows",
+	Use:     "arazzo",
+	Version: internal.BuildVersion,
+	Short:   "Run Arazzo 1.0.1 workflows",
 	Long: fmt.Sprintf(`
 arazzo loads an Arazzo document, resolves the referenced OpenAPI sources,
 and executes HTTP steps with a cookie jar so session cookies persist.
@@ -46,6 +47,8 @@ func Execute() {
 func init() {
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "debug, info, warn, or error")
+	// No -v shorthand: execute-workflow uses -v for request traces.
+	rootCmd.Flags().Bool("version", false, "print the build version and exit")
 }
 
 func loadRunner(path string, verbose bool) (*runner.Runner, error) {
