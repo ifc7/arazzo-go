@@ -32,6 +32,7 @@ require (
 )
 
 // ifc7/libopenapi: &&/||/parentheses in simple criteria, nil for missing
-// step outputs / empty response bodies, and integer 0/1 in simple conditions
-// (strconv.ParseBool must not win over ParseInt).
-replace github.com/pb33f/libopenapi => github.com/ifc7/libopenapi v0.0.0-20260904033543-203ee234ac75
+// step outputs / empty response bodies, integer 0/1 in simple conditions
+// (strconv.ParseBool must not win over ParseInt), runtime expressions in
+// payload replacement targets, and dependsOn workflows in the same RunWorkflow.
+replace github.com/pb33f/libopenapi => ../libopenapi
