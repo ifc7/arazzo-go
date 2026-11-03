@@ -1,6 +1,6 @@
 module github.com/ifc7/arazzo-go
 
-go 1.25.7
+go 1.26
 
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
