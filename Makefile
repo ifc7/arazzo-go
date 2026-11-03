@@ -5,9 +5,9 @@ BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 .PHONY: build
 build:
 	go build -ldflags "\
-		-X github.com/shaunhoulihan/arazzo-go/internal.BuildVersion=$(VERSION) \
-		-X github.com/shaunhoulihan/arazzo-go/internal.GitCommit=$(GIT_COMMIT) \
-		-X github.com/shaunhoulihan/arazzo-go/internal.BuildTime=$(BUILD_TIME)" \
+		-X github.com/ifc7/arazzo-go/internal.BuildVersion=$(VERSION) \
+		-X github.com/ifc7/arazzo-go/internal.GitCommit=$(GIT_COMMIT) \
+		-X github.com/ifc7/arazzo-go/internal.BuildTime=$(BUILD_TIME)" \
 		-o ./bin/arazzo ./cmd/arazzo
 
 .PHONY: install

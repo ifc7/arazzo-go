@@ -1,4 +1,4 @@
-module github.com/shaunhoulihan/arazzo-go
+module github.com/ifc7/arazzo-go
 
 go 1.25.7
 

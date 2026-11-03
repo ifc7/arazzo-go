@@ -16,7 +16,7 @@ import (
 	libarazzo "github.com/pb33f/libopenapi/arazzo"
 	"go.yaml.in/yaml/v4"
 
-	"github.com/shaunhoulihan/arazzo-go/internal/runner"
+	"github.com/ifc7/arazzo-go/internal/runner"
 )
 
 func TestFormatWorkflowList(t *testing.T) {

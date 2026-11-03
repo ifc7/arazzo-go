@@ -5,7 +5,7 @@ A command-line runner for [Arazzo 1.0.1](https://spec.openapis.org/arazzo/v1.0.1
 ## Install
 
 ```bash
-go install github.com/shaunhoulihan/arazzo-go/cmd/arazzo@latest
+go install github.com/ifc7/arazzo-go/cmd/arazzo@latest
 ```
 
 Or from this repo:
