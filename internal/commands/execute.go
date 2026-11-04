@@ -9,7 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/shaunhoulihan/arazzo-go/internal/runner"
+	"github.com/ifc7/arazzo-go/internal/runner"
 )
 
 var (
