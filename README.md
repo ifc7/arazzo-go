@@ -14,6 +14,23 @@ Or from this repo:
 go run ./cmd/arazzo --help
 ```
 
+### Docker
+
+Multi-arch images (`linux/amd64`, `linux/arm64`) are published to [Docker Hub](https://hub.docker.com/r/ifc7/arazzo) for each release tag (`vX.Y.Z` and `latest`). The image's working directory is `/work`, so mount your workflow files there:
+
+```bash
+docker run --rm -v "$PWD:/work" ifc7/arazzo execute-workflow wf.yaml \
+  --workflow-id <id> --inputs '{"baseUrl":"http://host.docker.internal:8080"}'
+```
+
+The container runs as a non-root user. If you write results into the mounted directory with `--output`, add `--user "$(id -u):$(id -g)"` so the container can write the file. Use `host.docker.internal` (Docker Desktop) or `--network host` (Linux) to reach APIs running on your machine.
+
+To build locally:
+
+```bash
+docker build -t arazzo .
+```
+
 ## Commands
 
 ```bash
