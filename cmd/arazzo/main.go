@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/shaunhoulihan/arazzo-go/internal/commands"
+	"github.com/ifc7/arazzo-go/internal/commands"
 )
 
 func main() {

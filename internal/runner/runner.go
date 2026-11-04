@@ -15,8 +15,8 @@ import (
 	higharazzo "github.com/pb33f/libopenapi/datamodel/high/arazzo"
 	v3 "github.com/pb33f/libopenapi/datamodel/high/v3"
 
-	"github.com/shaunhoulihan/arazzo-go/internal/executor"
-	"github.com/shaunhoulihan/arazzo-go/internal/sources"
+	"github.com/ifc7/arazzo-go/internal/executor"
+	"github.com/ifc7/arazzo-go/internal/sources"
 )
 
 // Result is the outcome of a single workflow run.

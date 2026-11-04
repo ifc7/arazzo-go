@@ -8,10 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/shaunhoulihan/arazzo-go/internal/executor"
-	"github.com/shaunhoulihan/arazzo-go/internal/runner"
-	"github.com/shaunhoulihan/arazzo-go/internal/ui"
 	"go.yaml.in/yaml/v4"
+
+	"github.com/ifc7/arazzo-go/internal/executor"
+	"github.com/ifc7/arazzo-go/internal/runner"
+	"github.com/ifc7/arazzo-go/internal/ui"
 )
 
 // JSONWorkflowResult represents the structured JSON output for a workflow execution.
