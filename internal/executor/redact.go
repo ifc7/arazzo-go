@@ -53,10 +53,6 @@ func RedactValue(v any) any {
 	}
 }
 
-func redactValue(v any) any {
-	return RedactValue(v)
-}
-
 func redactJSON(v any) string {
 	b, err := json.Marshal(RedactValue(v))
 	if err != nil {
