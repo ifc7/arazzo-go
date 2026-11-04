@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/shaunhoulihan/arazzo-go/schemas/workflow-result.schema.json",
+  "$id": "https://github.com/ifc7/arazzo-go/schemas/workflow-result.schema.json",
   "title": "Arazzo Workflow Result",
   "description": "Schema for machine-readable JSON execution results of arazzo-go workflows.",
   "type": "object",
