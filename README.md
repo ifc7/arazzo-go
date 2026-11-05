@@ -55,5 +55,6 @@ arazzo execute-workflow testdata/login.arazzo.yaml \
 | `--inputs` | JSON object of workflow inputs (default `{}`) |
 | `--verbose`, `-v` | Log each HTTP request and response (`execute-workflow` only) |
 | `--log-level` | `debug`, `info`, `warn`, or `error` (default `info`). Request traces require `debug` or `--verbose`. |
+| `--version` | Print the release version, git commit, and build time, then exit. |
 
 The runner does not inject authentication on its own. Pass credentials as workflow inputs, and rely on the cookie jar for subsequent steps after a login. Password, token, and session fields are redacted from request logs when `--verbose` is on.
