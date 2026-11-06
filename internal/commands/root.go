@@ -30,6 +30,7 @@ Build Version: %s
 Git Commit: %s
 Build Time: %s`,
 		internal.BuildVersion, internal.GitCommit, internal.BuildTime),
+	Version:       internal.BuildVersion,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 }
@@ -54,7 +55,18 @@ func printError(err error) {
 
 func init() {
 	rootCmd.CompletionOptions.HiddenDefaultCmd = true
+	rootCmd.SetVersionTemplate(versionTemplate())
+	// Define --version ourselves so Cobra doesn't add its default -v shorthand,
+	// which would be confused with execute-workflow's -v (--verbose).
+	rootCmd.Flags().Bool("version", false, "print version information and exit")
 	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "info", "debug, info, warn, or error")
+}
+
+// versionTemplate renders the output of --version. Cobra substitutes
+// {{.Version}}; commit and build time are baked in here.
+func versionTemplate() string {
+	return fmt.Sprintf("arazzo {{.Version}}\nGit Commit: %s\nBuild Time: %s\n",
+		internal.GitCommit, internal.BuildTime)
 }
 
 func loadRunner(path string, verbose bool) (*runner.Runner, error) {

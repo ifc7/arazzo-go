@@ -2,6 +2,7 @@ package commands
 
 import (
 	"log/slog"
+	"strings"
 	"testing"
 )
 
@@ -58,5 +59,22 @@ func TestExecuteWorkflowOutputFlag(t *testing.T) {
 	}
 	if flag.DefValue != "" {
 		t.Fatalf("default: got %q, want empty", flag.DefValue)
+	}
+}
+
+func TestRootVersionFlag(t *testing.T) {
+	t.Parallel()
+	if rootCmd.Version == "" {
+		t.Fatal("root command Version is empty; --version would not be registered")
+	}
+	flag := rootCmd.Flags().Lookup("version")
+	if flag == nil {
+		t.Fatal("missing --version")
+	}
+	if flag.Shorthand != "" {
+		t.Fatalf("--version should have no shorthand, got %q", flag.Shorthand)
+	}
+	if got := versionTemplate(); !strings.HasPrefix(got, "arazzo {{.Version}}\n") {
+		t.Fatalf("version template: got %q", got)
 	}
 }
