@@ -19,6 +19,11 @@ var secretKeyFragments = []string{
 	"cookie",
 }
 
+// IsSecretKey reports whether key matches any known secret fragment.
+func IsSecretKey(key string) bool {
+	return isSecretKey(key)
+}
+
 func isSecretKey(key string) bool {
 	k := strings.ToLower(key)
 	for _, frag := range secretKeyFragments {
