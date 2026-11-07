@@ -48,35 +48,34 @@ func TestHTTPHandlerDoesNotPreferHTML(t *testing.T) {
 func TestHTTPHandlerRejectsHTML(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/html")
-		_, _ = w.Write([]byte("<!doctype html><html></html>"))
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte("<!doctype html><html><head><title>docs</title></head><body>login</body></html>"))
 	}))
 	t.Cleanup(srv.Close)
 
 	handler := NewHTTPHandler(srv.Client())
-	_, err := handler(srv.URL + "/docs")
-	if err == nil || !strings.Contains(err.Error(), "returned HTML") {
-		t.Fatalf("expected HTML error, got %v", err)
+	_, err := handler(srv.URL + "/i/interface-7/user-session-api")
+	if err == nil {
+		t.Fatal("expected error on HTML response")
+	}
+	if !strings.Contains(err.Error(), "returned HTML") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
-// prefersHTML matches ifc locator negotiation: HTML wins when Accept lists
-// text/html and does not list */* with a higher q.
 func prefersHTML(accept string) bool {
-	if accept == "" {
-		return false
-	}
-	htmlQ, starQ, hasHTML := -1.0, -1.0, false
-	for _, p := range strings.Split(accept, ",") {
-		media, q := parseAcceptPart(p)
-		switch {
-		case strings.HasPrefix(media, "text/html"):
+	var htmlQ, starQ float64 = -1, -1
+	var hasHTML bool
+	for _, part := range strings.Split(accept, ",") {
+		media, q := parseAcceptPart(part)
+		switch media {
+		case "text/html", "application/xhtml+xml":
 			hasHTML = true
-			if htmlQ < 0 {
+			if q > htmlQ {
 				htmlQ = q
 			}
-		case media == "*/*":
-			if starQ < 0 {
+		case "*/*":
+			if q > starQ {
 				starQ = q
 			}
 		}
@@ -103,4 +102,24 @@ func parseAcceptPart(p string) (media string, q float64) {
 		}
 	}
 	return media, q
+}
+
+func looksLikeOpenAPI(body []byte) bool {
+	s := strings.TrimSpace(string(body))
+	if s == "" {
+		return false
+	}
+	if s[0] == '{' || s[0] == '[' {
+		ls := strings.ToLower(s)
+		return strings.Contains(ls, `"openapi"`) || strings.Contains(ls, `"swagger"`)
+	}
+	for _, line := range strings.Split(s, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		lower := strings.ToLower(line)
+		return strings.HasPrefix(lower, "openapi:") || strings.HasPrefix(lower, "swagger:")
+	}
+	return false
 }
