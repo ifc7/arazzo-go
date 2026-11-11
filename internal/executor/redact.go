@@ -21,10 +21,6 @@ var secretKeyFragments = []string{
 
 // IsSecretKey reports whether key matches any known secret fragment.
 func IsSecretKey(key string) bool {
-	return isSecretKey(key)
-}
-
-func isSecretKey(key string) bool {
 	k := strings.ToLower(key)
 	for _, frag := range secretKeyFragments {
 		if strings.Contains(k, frag) {
@@ -40,7 +36,7 @@ func RedactValue(v any) any {
 	case map[string]any:
 		out := make(map[string]any, len(t))
 		for k, val := range t {
-			if isSecretKey(k) {
+			if IsSecretKey(k) {
 				out[k] = "***"
 				continue
 			}
@@ -81,7 +77,7 @@ func redactURL(raw string) string {
 	q := u.Query()
 	changed := false
 	for k := range q {
-		if isSecretKey(k) {
+		if IsSecretKey(k) {
 			q.Set(k, "***")
 			changed = true
 		}
