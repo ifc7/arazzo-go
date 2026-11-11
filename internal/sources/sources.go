@@ -22,26 +22,6 @@ func looksLikeHTML(body []byte, contentType string) bool {
 	return strings.HasPrefix(ls, "<!doctype html") || strings.HasPrefix(ls, "<html")
 }
 
-func looksLikeOpenAPI(body []byte) bool {
-	s := strings.TrimSpace(string(body))
-	if s == "" {
-		return false
-	}
-	if s[0] == '{' || s[0] == '[' {
-		ls := strings.ToLower(s)
-		return strings.Contains(ls, `"openapi"`) || strings.Contains(ls, `"swagger"`)
-	}
-	for _, line := range strings.Split(s, "\n") {
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-		lower := strings.ToLower(line)
-		return strings.HasPrefix(lower, "openapi:") || strings.HasPrefix(lower, "swagger:")
-	}
-	return false
-}
-
 // NewHTTPHandler fetches an OpenAPI source over HTTP.
 // Accept is set so content-negotiating locators (ifc /i/... URLs) return the
 // spec rather than HTML docs.

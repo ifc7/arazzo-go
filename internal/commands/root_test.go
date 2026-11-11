@@ -78,3 +78,25 @@ func TestRootVersionFlag(t *testing.T) {
 		t.Fatalf("version template: got %q", got)
 	}
 }
+
+func TestExecuteWorkflowInputsFileFlag(t *testing.T) {
+	t.Parallel()
+	flag := executeCmd.Flags().Lookup("inputs-file")
+	if flag == nil {
+		t.Fatal("missing --inputs-file")
+	}
+	if flag.DefValue != "" {
+		t.Fatalf("default: got %q, want empty", flag.DefValue)
+	}
+}
+
+func TestExecuteWorkflowEnvFileFlag(t *testing.T) {
+	t.Parallel()
+	flag := executeCmd.Flags().Lookup("env-file")
+	if flag == nil {
+		t.Fatal("missing --env-file")
+	}
+	if flag.DefValue != "" {
+		t.Fatalf("default: got %q, want empty", flag.DefValue)
+	}
+}

@@ -1,7 +1,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -15,6 +14,8 @@ import (
 var (
 	executeWorkflowID string
 	executeInputs     string
+	executeInputsFile string
+	executeEnvFile    string
 	executeVerbose    bool
 	executeFormat     string
 	executeOutput     string
@@ -24,11 +25,19 @@ var executeCmd = &cobra.Command{
 	Use:   "execute-workflow <file>",
 	Short: "Run a workflow from an Arazzo document",
 	Long: `
-Execute a workflow by id. Pass workflow inputs as a JSON object.
+Execute a workflow by id. Pass workflow inputs as a JSON object, from a file,
+from a .env file, or via ARAZZO_INPUT_<NAME> environment variables.
 
-The runner does not inject authentication. Include credentials in --inputs
-and rely on the cookie jar for later steps. A baseUrl input (or --inputs
-baseUrl) is required unless the document already targets an absolute host.
+Input sources merge with precedence:
+  ARAZZO_INPUT_<NAME> (env) < --env-file < --inputs-file < --inputs
+
+Environment variable and .env keys match workflow input schema properties
+case-insensitively (e.g. ARAZZO_INPUT_BASEURL or ARAZZO_INPUT_baseUrl to baseUrl)
+and are coerced to schema property types (integer, boolean, object as JSON).
+
+The runner does not inject authentication. Include credentials in inputs
+and rely on the cookie jar for later steps. A baseUrl input is required unless
+the document already targets an absolute host.
 
 HTTP request and response traces are off by default. Pass --verbose (or
 --log-level=debug) to print them.
@@ -43,14 +52,17 @@ HTTP request and response traces are off by default. Pass --verbose (or
 			return fmt.Errorf("unsupported output format %q: expected text, json, or junit", executeFormat)
 		}
 
-		inputs := map[string]any{}
-		if strings.TrimSpace(executeInputs) != "" {
-			if err := json.Unmarshal([]byte(executeInputs), &inputs); err != nil {
-				return fmt.Errorf("invalid --inputs JSON: %w", err)
-			}
+		r, err := loadRunner(args[0], executeVerbose)
+		if err != nil {
+			return err
 		}
 
-		r, err := loadRunner(args[0], executeVerbose)
+		inputs, err := r.ResolveWorkflowInputs(executeWorkflowID, runner.InputSources{
+			EnvFile:    executeEnvFile,
+			InputsFile: executeInputsFile,
+			Inputs:     executeInputs,
+			Stdin:      cmd.InOrStdin(),
+		})
 		if err != nil {
 			return err
 		}
@@ -101,6 +113,8 @@ HTTP request and response traces are off by default. Pass --verbose (or
 func init() {
 	executeCmd.Flags().StringVar(&executeWorkflowID, "workflow-id", "", "workflow to run")
 	executeCmd.Flags().StringVar(&executeInputs, "inputs", "{}", "JSON object of workflow inputs")
+	executeCmd.Flags().StringVar(&executeInputsFile, "inputs-file", "", "path to JSON/YAML inputs file, or - for stdin")
+	executeCmd.Flags().StringVar(&executeEnvFile, "env-file", "", "path to .env file")
 	executeCmd.Flags().BoolVarP(&executeVerbose, "verbose", "v", false, "log each HTTP request and response")
 	executeCmd.Flags().StringVar(&executeFormat, "format", "text", "output format: text, json, or junit")
 	executeCmd.Flags().StringVarP(&executeOutput, "output", "o", "", "write report to file instead of stdout")
